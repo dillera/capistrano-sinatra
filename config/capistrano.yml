@@ -1,0 +1,7 @@
+repository: https://github.com/shadabahmed/ubuntu-kiosk.git
+servers:
+  - 172.16.32.204
+user: ubuntu
+password: ubuntu
+sudo_user: ubuntu
+sudo_password: ubuntu

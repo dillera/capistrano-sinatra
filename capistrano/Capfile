@@ -1,0 +1,82 @@
+require 'capistrano'
+require 'bundler/capistrano'
+
+load 'deploy'
+load File.expand_path('../config.rb', __FILE__)
+
+namespace :deploy do
+
+  task :install do
+    run "wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | #{sudo} apt-key add -"
+    run "test -f /etc/apt/sources.list.d/google.list || #{sudo} sh -c 'echo \"deb http://dl.google.com/linux/chrome/deb/ stable main\" >> /etc/apt/sources.list.d/google.list'"
+    run "#{sudo} apt-get update"
+    run "#{sudo} apt-get -y install curl xorg google-chrome-stable git ruby1.9.3", :shell => :bash
+    run "#{sudo} /usr/lib/lightdm/lightdm-set-defaults --autologin #{user}"
+    run "#{sudo} gem install bundler --no-ri --no-rdoc"
+  end
+
+  task :setup do
+    run "mkdir -p #{deploy_to}/releases"
+    run "mkdir -p ~/.config"
+    put <<-SESSION, "/tmp/#{user}.desktop"
+[Desktop Entry]
+Encoding=UTF-8
+Name=Kiosk Mode
+Comment=Chromium Kiosk Mode
+Exec=/usr/share/xsessions/#{user}.sh
+Type=Application
+SESSION
+
+    put <<-DMRC, "/home/#{user}/.dmrc"
+[Desktop]
+Session=#{user}
+Language=en_US
+DMRC
+    run "#{sudo} mv /tmp/#{user}.desktop /usr/share/xsessions"
+    run "chmod 644 /home/#{user}/.dmrc"
+  end
+
+  # Also overwritten to remove Rails-specific code.
+  task :finalize_update, :except => { :no_release => true } do
+    put <<-SCRIPT, "/tmp/#{user}.sh"
+#!/bin/bash
+gnome-session --session=ubuntu &
+gsettings set org.gnome.desktop.screensaver idle-activation-enabled false
+gsettings set org.gnome.desktop.screensaver idle-activation-enabled never
+gsettings set org.gnome.desktop.screensaver logout-delay 0
+gsettings set org.gnome.settings-daemon.plugins.power active false
+xset s off
+xset s noblank
+xset -dpms
+while true; do #{release_path}/kiosk; sleep 5s; done
+    SCRIPT
+    run "#{sudo} mv /tmp/#{user}.sh /usr/share/xsessions"
+    run "#{sudo} chmod 755 /usr/share/xsessions/#{user}.sh"
+    run "killall chrome || : && sleep 1 && rm -rf ~/.config/google-chrome/ && cp -r #{release_path}/google-chrome/ ~/.config/"
+    run "rm -rf #{release_path}/google-chrome"
+  end
+
+  task :cleanup do
+    run "rm #{release_path}/Capfile"
+    run "rm -rf #{release_path}/config"
+  end
+  task :migrate do
+  end
+
+  task :migrations do
+  end
+
+  task :cold do
+  end
+
+  task :start do
+  end
+
+  task :stop do
+  end
+
+  task :restart do
+    run "#{sudo} restart lightdm"
+  end
+end
+
