@@ -7,11 +7,14 @@ set :deploy_via, :remote_cache
 
 config = YAML.load(File.read(File.expand_path('../../config/capistrano.yml', __FILE__)))
 set :repository,  config['repository']
-role :app, *config['servers']
 set :user, config['user']
 set :password, config['password']
 set :sudo_user, config['sudo_user']
-set :sudo_password, config[:sudo_password]
+set :sudo_password, config['sudo_password']
+
+config['servers'].each do |name, ip|
+  role :app, ip, :name => name
+end
 
 default_run_options[:pty] = true
 ssh_options[:forward_agent] = true
